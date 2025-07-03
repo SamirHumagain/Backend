@@ -18,8 +18,8 @@ class RegisterUserAPIView(APIView):
         if serializer.is_valid():
             user = serializer.save()
             login(request, user)  # optional if frontend uses session auth
-            token, _ = Token.objects.get_or_create(user=user)
-            return Response({'message': 'User registered and logged in.', 'token': token.key}, status=201)
+
+            return Response({'message': 'User registered'}, status=201)
         return Response(serializer.errors, status=400)
 
 class RegisterOwnerAPIView(APIView):
@@ -30,8 +30,7 @@ class RegisterOwnerAPIView(APIView):
         if serializer.is_valid():
             user = serializer.save()
             login(request, user)
-            token, _ = Token.objects.get_or_create(user=user)
-            return Response({'message': 'Owner registered and logged in.', 'token': token.key}, status=201)
+            return Response({'message': 'Owner registered and logged in.'}, status=201)
         return Response(serializer.errors, status=400)
 
 class LoginAPIView(APIView):
@@ -40,10 +39,15 @@ class LoginAPIView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.validated_data
+            user = serializer.validated_data['user']  # <-- FIXED
             login(request, user)
             token, _ = Token.objects.get_or_create(user=user)
-            return Response({'message': 'Logged in successfully.', 'token': token.key}, status=200)
+            return Response({'message': 'Logged in successfully.', 'token': token.key ,   "user": {
+        "id": user.id,
+        "email": user.email,
+        "role": getattr(user, 'user_type', None), 
+        
+    }}, status=200)
         return Response(serializer.errors, status=400)
 
 class LogoutAPIView(APIView):
