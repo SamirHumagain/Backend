@@ -7,10 +7,11 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
     confirmPassword = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
     agreeToTerms = serializers.BooleanField(required=False)  # Optional validation
+    role = serializers.CharField(required=False, default='user')
 
     class Meta:
         model = CustomUser
-        fields = ['name', 'email', 'password', 'confirmPassword', 'agreeToTerms']
+        fields = ['name', 'email', 'password', 'confirmPassword', 'agreeToTerms', 'role']
 
     def validate(self, attrs):
         if attrs['password'] != attrs['confirmPassword']:
@@ -20,6 +21,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        role = validated_data.pop('role', 'user')
         validated_data.pop('confirmPassword')
         validated_data.pop('agreeToTerms', None)
         user = CustomUser.objects.create_user(
@@ -27,19 +29,38 @@ class UserRegisterSerializer(serializers.ModelSerializer):
             email=validated_data.get('email'),
             password=validated_data['password']
         )
+        user.user_type = role
+        user.save()
         return user
 
 
-class OwnerRegisterSerializer(UserRegisterSerializer):
+class OwnerRegisterSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(required=True)
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    confirmPassword = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    agreeToTerms = serializers.BooleanField(required=True)
+
+    class Meta:
+        model = CustomUser
+        fields = ['name', 'email', 'password', 'confirmPassword', 'agreeToTerms']
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['confirmPassword']:
+            raise serializers.ValidationError({"password": "Password fields didn't match."})
+        if not attrs.get('agreeToTerms', False):
+            raise serializers.ValidationError({"agreeToTerms": "You must agree to the terms."})
+        return attrs
+
     def create(self, validated_data):
         validated_data.pop('confirmPassword')
         validated_data.pop('agreeToTerms', None)
         user = CustomUser.objects.create_user(
-            username=validated_data['username'],
-            email=validated_data.get('email'),
-            password=validated_data['password']
+            name=validated_data['name'],
+            email=validated_data['email'],
+            password=validated_data['password'],
         )
-        user.user_type = 'owner'
+        user.user_type = 'venue_owner' 
         user.save()
         return user
 

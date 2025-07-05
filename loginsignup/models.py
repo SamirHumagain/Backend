@@ -31,10 +31,10 @@ class CustomUser(AbstractUser):
 
     USER_TYPE_CHOICES = (
         ('user', 'User'),
-        ('owner', 'Venue Owner'),
+        ('venue_owner', 'Venue Owner'),
         ('admin', 'Admin'),
     )
-    user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES, default='user')
+    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='user')
 
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
