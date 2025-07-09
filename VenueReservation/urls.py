@@ -17,7 +17,8 @@ Including another URLconf
 
 from django.http import HttpResponse
 from django.urls import path, include
-
+from django.conf import settings
+from django.conf.urls.static import static
 def home(request):
     return HttpResponse("Welcome to Venue Reservation System!")
 
@@ -29,6 +30,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
       path('auth/', include('loginsignup.urls')),
-   
+    path('api/', include('venue.urls')),
 ]
-
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
