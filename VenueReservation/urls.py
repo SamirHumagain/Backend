@@ -24,11 +24,11 @@ def home(request):
 from django.contrib import admin
 from django.urls import path ,include
 
+
 urlpatterns = [
-      path('', home),
+    path('', home),
     path('admin/', admin.site.urls),
-    
-      path('auth/', include('loginsignup.urls')),
-   
+    path('auth/', include('loginsignup.urls')),
+    path('api/', include('venues.urls')),
 ]
 
