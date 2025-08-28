@@ -31,9 +31,11 @@ class Event(models.Model):
         return self.name
 
 class Reservation(models.Model):
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reservations')
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='reservations')
     reserved_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, default="pending")  # pending, approved, rejected
 
     def __str__(self):
         return f"{self.user.email} - {self.event.name}"
@@ -46,3 +48,4 @@ class Service(models.Model):
 
     def __str__(self):
         return self.name
+

@@ -7,7 +7,7 @@ from django.db.models import Sum, Count, Avg
 from datetime import datetime, timedelta
 
 from .models import Venue, Event, Reservation, Service
-from .serializers import VenueSerializer, EventSerializer, ReservationSerializer, ServiceSerializer
+from .serializers import VenueSerializer, EventSerializer, ReservationSerializer, ServiceSerializer, ReservationUserDashboardSerializer
 from loginsignup.models import CustomUser
 
 class AdminAnalyticsStats(APIView):
@@ -72,10 +72,60 @@ class EventViewSet(viewsets.ModelViewSet):
     serializer_class = EventSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
+    def perform_create(self, serializer):
+        serializer.save(organizer=self.request.user)
+
 class ReservationViewSet(viewsets.ModelViewSet):
+
     queryset = Reservation.objects.all()
     serializer_class = ReservationSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def create(self, request, *args, **kwargs):
+        # Expecting event to be created first, then reservation
+        event_id = request.data.get('event')
+        if not event_id:
+            return Response({'error': 'Event ID is required.'}, status=400)
+        try:
+            event = Event.objects.get(id=event_id)
+        except Event.DoesNotExist:
+            return Response({'error': 'Event not found.'}, status=404)
+
+        # Check if another event exists for this venue and date
+        # (excluding this event itself)
+        same_venue_events = Event.objects.filter(venue=event.venue, date=event.date).exclude(id=event.id)
+        if same_venue_events.exists():
+            return Response({'error': 'This venue is already booked for the selected date.'}, status=400)
+
+        # Also check if a reservation already exists for this event
+        if Reservation.objects.filter(event=event).exists():
+            return Response({'error': 'This event is already reserved.'}, status=400)
+
+        return super().create(request, *args, **kwargs)
+
+    # Custom actions for approval/rejection
+    from rest_framework.decorators import action
+    from rest_framework import status
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def approve(self, request, pk=None):
+        reservation = self.get_object()
+        # Only the owner of the venue can approve
+        if reservation.event.venue.owner != request.user:
+            return Response({'detail': 'Not allowed.'}, status=403)
+        reservation.status = 'approved'
+        reservation.save()
+        return Response({'status': 'approved'})
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def reject(self, request, pk=None):
+        reservation = self.get_object()
+        # Only the owner of the venue can reject
+        if reservation.event.venue.owner != request.user:
+            return Response({'detail': 'Not allowed.'}, status=403)
+        reservation.status = 'rejected'
+        reservation.save()
+        return Response({'status': 'rejected'})
 
 class ServiceViewSet(viewsets.ModelViewSet):
     queryset = Service.objects.all()
@@ -136,10 +186,13 @@ class UserDashboardStats(APIView):
 class UserBookingList(APIView):
     permission_classes = [IsAuthenticated]
 
+    from .serializers import ReservationUserDashboardSerializer
+
     def get(self, request):
         user = request.user
-        bookings = Reservation.objects.filter(user=user).values()
-        return Response(list(bookings))
+        bookings = Reservation.objects.filter(user=user)
+        serializer = ReservationUserDashboardSerializer(bookings, many=True)
+        return Response(serializer.data)
 
 class UserProfile(APIView):
     permission_classes = [IsAuthenticated]
