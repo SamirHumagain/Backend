@@ -2,7 +2,9 @@ from rest_framework.routers import DefaultRouter
 from django.urls import path
 from .views import (VenueViewSet, EventViewSet, ReservationViewSet, ServiceViewSet,
                     AdminDashboardStats, AdminUserList, AdminVenueList, AdminBookingList,
-                    UserDashboardStats, UserBookingList, UserProfile, AdminAnalyticsStats)
+                    UserDashboardStats, UserBookingList, UserProfile, AdminAnalyticsStats,
+                    OwnerVenueBookingList)
+from .admin_user_detail import AdminUserDetail
 
 router = DefaultRouter()
 router.register(r'venues', VenueViewSet)
@@ -19,4 +21,6 @@ urlpatterns = router.urls + [
     path('user-dashboard/bookings/', UserBookingList.as_view(), name='user-dashboard-bookings'),
     path('user-dashboard/profile/', UserProfile.as_view(), name='user-dashboard-profile'),
     path('admin-dashboard/analytics/', AdminAnalyticsStats.as_view(), name='admin-dashboard-analytics'),
+    path('venues/owner/bookings/', OwnerVenueBookingList.as_view(), name='owner-venue-bookings'),
+    path('users/<int:user_id>/', AdminUserDetail.as_view(), name='admin-user-detail'),
 ]

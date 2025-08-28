@@ -1,3 +1,19 @@
+# Ensure IsAuthenticated is imported at the top
+from rest_framework.permissions import IsAuthenticated
+# Ensure APIView is imported at the top
+from rest_framework.views import APIView
+class OwnerVenueBookingList(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Get all reservations for venues owned by this user
+        owner = request.user
+        venues = Venue.objects.filter(owner=owner)
+        events = Event.objects.filter(venue__in=venues)
+        bookings = Reservation.objects.filter(event__in=events).select_related('event', 'user')
+        from .serializers import ReservationOwnerDashboardSerializer
+        serializer = ReservationOwnerDashboardSerializer(bookings, many=True)
+        return Response(serializer.data)
 
 from rest_framework import viewsets, permissions
 from rest_framework.views import APIView
@@ -7,7 +23,7 @@ from django.db.models import Sum, Count, Avg
 from datetime import datetime, timedelta
 
 from .models import Venue, Event, Reservation, Service
-from .serializers import VenueSerializer, EventSerializer, ReservationSerializer, ServiceSerializer, ReservationUserDashboardSerializer
+from .serializers import VenueSerializer, EventSerializer, ReservationSerializer, ServiceSerializer, ReservationUserDashboardSerializer, AdminBookingSerializer
 from loginsignup.models import CustomUser
 
 class AdminAnalyticsStats(APIView):
@@ -155,22 +171,43 @@ class AdminUserList(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        users = CustomUser.objects.all().values('id', 'name', 'email', 'user_type', 'date_joined', 'is_active')
-        return Response(list(users))
+        users = CustomUser.objects.all()
+        user_data = []
+        from .models import Venue, Reservation
+        for user in users:
+            venues_count = 0
+            bookings_count = 0
+            if user.user_type == 'venue_owner':
+                venues_count = Venue.objects.filter(owner=user).count()
+            bookings_count = Reservation.objects.filter(user=user).count()
+            user_data.append({
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'user_type': user.user_type,
+                'date_joined': user.date_joined,
+                'is_active': user.is_active,
+                'venues': venues_count,
+                'bookings': bookings_count,
+            })
+        return Response(user_data)
 
 class AdminVenueList(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        venues = Venue.objects.all().values()
-        return Response(list(venues))
+        venues = Venue.objects.all()
+        serializer = VenueSerializer(venues, many=True)
+        return Response(serializer.data)
 
 class AdminBookingList(APIView):
     permission_classes = [IsAdminUser]
 
+
     def get(self, request):
-        bookings = Reservation.objects.all().values()
-        return Response(list(bookings))
+        bookings = Reservation.objects.select_related('event__venue', 'user', 'event').all()
+        serializer = AdminBookingSerializer(bookings, many=True)
+        return Response(serializer.data)
 
 class UserDashboardStats(APIView):
     permission_classes = [IsAuthenticated]
@@ -206,4 +243,29 @@ class UserProfile(APIView):
             'user_type': user.user_type,
             'date_joined': user.date_joined,
             'is_active': user.is_active,
+            'phone': user.phone,
+            'address': user.address,
+            'profile_image': user.profile_image,
+        })
+
+    def patch(self, request):
+        user = request.user
+        data = request.data
+        updated = False
+        for field in ['name', 'email', 'phone', 'address', 'profile_image']:
+            if field in data:
+                setattr(user, field, data[field])
+                updated = True
+        if updated:
+            user.save()
+        return Response({
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+            'user_type': user.user_type,
+            'date_joined': user.date_joined,
+            'is_active': user.is_active,
+            'phone': user.phone,
+            'address': user.address,
+            'profile_image': user.profile_image,
         })

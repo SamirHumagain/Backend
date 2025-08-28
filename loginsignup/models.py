@@ -24,10 +24,14 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
+
 class CustomUser(AbstractUser):
     username = None
     email = models.EmailField(unique=True)
-    name = models.CharField(max_length=100 , default="")  
+    name = models.CharField(max_length=100, default="")
+    phone = models.CharField(max_length=20, blank=True, default="")
+    address = models.CharField(max_length=255, blank=True, default="")
+    profile_image = models.URLField(max_length=500, blank=True, default="https://ui-avatars.com/api/?name=User")
 
     USER_TYPE_CHOICES = (
         ('user', 'User'),
