@@ -1,3 +1,12 @@
+
+# Email backend for sending real OTP emails (Gmail example)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'hmgsamir460@gmail.com'  # <-- Replace with your Gmail address
+EMAIL_HOST_PASSWORD = 'sxrm iovd klwn mutm'   # <-- Replace with your Gmail App Password
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 """
 Django settings for VenueReservation project.
 
@@ -57,10 +66,17 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
-    
+    "http://127.0.0.1:5173",
+]
+
+# Allow Vite/React dev server for CSRF
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 
 ROOT_URLCONF = 'VenueReservation.urls'
