@@ -1,3 +1,33 @@
+import math
+
+# Haversine formula utility
+def haversine_distance(lat1, lon1, lat2, lon2):
+    R = 6371  # Earth radius in kilometers
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+# API endpoint for Haversine distance
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def haversine_api(request):
+    try:
+        lat1 = float(request.query_params.get('lat1'))
+        lon1 = float(request.query_params.get('lon1'))
+        lat2 = float(request.query_params.get('lat2'))
+        lon2 = float(request.query_params.get('lon2'))
+    except (TypeError, ValueError):
+        return Response({'error': 'Invalid or missing parameters.'}, status=400)
+    distance = haversine_distance(lat1, lon1, lat2, lon2)
+    return Response({'distance_km': round(distance, 3)})
 # Ensure IsAuthenticated is imported at the top
 from rest_framework.permissions import IsAuthenticated
 # Ensure APIView is imported at the top
@@ -88,6 +118,17 @@ class EventViewSet(viewsets.ModelViewSet):
     serializer_class = EventSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        venue_id = self.request.query_params.get('venue')
+        if venue_id:
+            # Only include events for this venue that have an approved reservation
+            queryset = queryset.filter(
+                venue_id=venue_id,
+                reservations__status='approved'
+            ).distinct()
+        return queryset
+
     def perform_create(self, serializer):
         serializer.save(organizer=self.request.user)
 
@@ -107,14 +148,15 @@ class ReservationViewSet(viewsets.ModelViewSet):
         except Event.DoesNotExist:
             return Response({'error': 'Event not found.'}, status=404)
 
-        # Check if another event exists for this venue and date
-        # (excluding this event itself)
-        same_venue_events = Event.objects.filter(venue=event.venue, date=event.date).exclude(id=event.id)
-        if same_venue_events.exists():
-            return Response({'error': 'This venue is already booked for the selected date.'}, status=400)
 
-        # Also check if a reservation already exists for this event
-        if Reservation.objects.filter(event=event).exists():
+        # Only block if there is an event for this venue/date with an approved reservation
+        same_venue_events = Event.objects.filter(venue=event.venue, date=event.date).exclude(id=event.id)
+        for ev in same_venue_events:
+            if Reservation.objects.filter(event=ev, status='approved').exists():
+                return Response({'error': 'This venue is already booked for the selected date.'}, status=400)
+
+        # Only block if this event already has an approved reservation
+        if Reservation.objects.filter(event=event, status='approved').exists():
             return Response({'error': 'This event is already reserved.'}, status=400)
 
         return super().create(request, *args, **kwargs)

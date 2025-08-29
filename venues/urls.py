@@ -3,7 +3,7 @@ from django.urls import path
 from .views import (VenueViewSet, EventViewSet, ReservationViewSet, ServiceViewSet,
                     AdminDashboardStats, AdminUserList, AdminVenueList, AdminBookingList,
                     UserDashboardStats, UserBookingList, UserProfile, AdminAnalyticsStats,
-                    OwnerVenueBookingList)
+                    OwnerVenueBookingList, haversine_api)
 from .admin_user_detail import AdminUserDetail
 
 router = DefaultRouter()
@@ -23,4 +23,5 @@ urlpatterns = router.urls + [
     path('admin-dashboard/analytics/', AdminAnalyticsStats.as_view(), name='admin-dashboard-analytics'),
     path('venues/owner/bookings/', OwnerVenueBookingList.as_view(), name='owner-venue-bookings'),
     path('users/<int:user_id>/', AdminUserDetail.as_view(), name='admin-user-detail'),
+    path('haversine/', haversine_api, name='haversine-api'),
 ]
