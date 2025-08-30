@@ -16,7 +16,11 @@ router.register(r'services', ServiceViewSet)
 router.register(r'venue-ratings', VenueRatingViewSet, basename='venue-rating')
 router.register(r'favorite-venues', FavoriteVenueViewSet, basename='favorite-venue')
 
-urlpatterns = router.urls + [
+urlpatterns = [
+    path('venues/owner/',
+         VenueViewSet.as_view({'get': 'list'}),
+         name='owner-venue-list'),
+] + router.urls + [
     path('admin-dashboard/stats/', AdminDashboardStats.as_view(), name='admin-dashboard-stats'),
     path('admin-dashboard/users/', AdminUserList.as_view(), name='admin-dashboard-users'),
     path('admin-dashboard/venues/', AdminVenueList.as_view(), name='admin-dashboard-venues'),

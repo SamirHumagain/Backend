@@ -169,11 +169,28 @@ class AdminAnalyticsStats(APIView):
         })
 
 
-class VenueViewSet(viewsets.ModelViewSet):
 
+# VenueViewSet for /api/venues/owner/ to return bookings_count and pending_requests
+class VenueViewSet(viewsets.ModelViewSet):
     queryset = Venue.objects.all()
     serializer_class = VenueSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        user = self.request.user
+        # If the user is authenticated and is a venue owner, return only their venues with booking stats
+        if user.is_authenticated and hasattr(user, 'user_type') and user.user_type == 'venue_owner':
+            from django.db.models import Count, Q, Avg
+            return (
+                Venue.objects.filter(owner=user)
+                .annotate(
+                    bookings_count=Count('events__reservations', filter=Q(events__reservations__status='approved'), distinct=True),
+                    pending_requests=Count('events__reservations', filter=Q(events__reservations__status='pending'), distinct=True),
+                    avg_rating=Avg('ratings__rating')
+                )
+            )
+        # Otherwise, return all venues
+        return Venue.objects.all()
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -238,6 +255,18 @@ class ReservationViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Not allowed.'}, status=403)
         reservation.status = 'approved'
         reservation.save()
+        # Send email to user notifying approval
+        from django.core.mail import send_mail
+        user = reservation.user
+        event = reservation.event
+        venue = event.venue
+        send_mail(
+            'Your Venue Booking is Approved',
+            f'Hi {user.name}, your booking for {venue.name} on {event.date.strftime('%Y-%m-%d')} has been approved!',
+            'noreply@yourdomain.com',
+            [user.email],
+            fail_silently=True,
+        )
         return Response({'status': 'approved'})
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
@@ -248,6 +277,18 @@ class ReservationViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Not allowed.'}, status=403)
         reservation.status = 'rejected'
         reservation.save()
+        # Send email to user notifying rejection
+        from django.core.mail import send_mail
+        user = reservation.user
+        event = reservation.event
+        venue = event.venue
+        send_mail(
+            'Your Venue Booking is Rejected',
+            f'Hi {user.name}, your booking for {venue.name} on {event.date.strftime('%Y-%m-%d')} has been rejected.',
+            'noreply@yourdomain.com',
+            [user.email],
+            fail_silently=True,
+        )
         return Response({'status': 'rejected'})
 
 class ServiceViewSet(viewsets.ModelViewSet):

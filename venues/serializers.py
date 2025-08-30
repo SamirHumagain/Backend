@@ -5,12 +5,23 @@ from .models import Venue, Event, Reservation, Service, VenueRating, FavoriteVen
 from loginsignup.owner_detail_serializer import OwnerDetailSerializer
 
 # --- Serializers for VenueRating and FavoriteVenue ---
+
 class VenueSerializer(serializers.ModelSerializer):
     rating = serializers.SerializerMethodField()
+    bookings_count = serializers.IntegerField(required=False)
+    pending_requests = serializers.IntegerField(required=False)
+    avg_rating = serializers.SerializerMethodField(read_only=True)
+
 
     class Meta:
         model = Venue
         fields = '__all__'
+
+    def get_avg_rating(self, obj):
+        avg = getattr(obj, "avg_rating", None)
+        if avg is None:
+            return None
+        return round(avg, 2)
 
     def get_rating(self, obj):
         ratings = getattr(obj, 'ratings', None)
