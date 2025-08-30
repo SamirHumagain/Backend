@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from django.utils import timezone
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -24,6 +25,23 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
+
+class EmailOTP(models.Model):
+    email = models.EmailField(unique=True)
+    otp = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_verified = models.BooleanField(default=False)
+
+    def generate_otp(self):
+        import random
+        self.otp = ''.join(random.choices('0123456789', k=6))
+        self.created_at = timezone.now()
+        self.is_verified = False
+        self.save()
+        return self.otp
+
+    def __str__(self):
+        return f"{self.email} - {self.otp}"
 
 class CustomUser(AbstractUser):
     username = None

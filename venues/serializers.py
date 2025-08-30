@@ -1,6 +1,42 @@
-# Import serializers from rest_framework
+
+# All imports at the very top
 from rest_framework import serializers
-from .models import Reservation
+from .models import Venue, Event, Reservation, Service, VenueRating, FavoriteVenue
+from loginsignup.owner_detail_serializer import OwnerDetailSerializer
+
+# --- Serializers for VenueRating and FavoriteVenue ---
+class VenueSerializer(serializers.ModelSerializer):
+    rating = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Venue
+        fields = '__all__'
+
+    def get_rating(self, obj):
+        ratings = getattr(obj, 'ratings', None)
+        if ratings is None:
+            return 0
+        ratings_qs = ratings.all()
+        if ratings_qs.exists():
+            return round(sum(r.rating for r in ratings_qs) / ratings_qs.count(), 2)
+        return 0
+class VenueRatingSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
+    venue = serializers.PrimaryKeyRelatedField(queryset=Venue.objects.all())
+
+    class Meta:
+        model = VenueRating
+        fields = ['id', 'user', 'venue', 'rating', 'comment', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'user', 'created_at', 'updated_at']
+
+class FavoriteVenueSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
+    venue = serializers.PrimaryKeyRelatedField(queryset=Venue.objects.all())
+
+    class Meta:
+        model = FavoriteVenue
+        fields = ['id', 'user', 'venue', 'added_at']
+        read_only_fields = ['id', 'user', 'added_at']
 
 # Admin Booking Serializer for richer admin dashboard data
 class AdminBookingSerializer(serializers.ModelSerializer):
@@ -21,7 +57,7 @@ class AdminBookingSerializer(serializers.ModelSerializer):
 
     def get_venue_name(self, obj):
         try:
-            return obj.event.venue.name
+            return obj.event.venue.location_name or obj.event.venue.name
         except Exception:
             return None
 
@@ -61,11 +97,7 @@ from .models import Venue, Event, Reservation, Service
 
 from loginsignup.owner_detail_serializer import OwnerDetailSerializer
 
-class VenueSerializer(serializers.ModelSerializer):
-    owner = OwnerDetailSerializer(read_only=True)
-    class Meta:
-        model = Venue
-        fields = '__all__'
+
 
 class EventSerializer(serializers.ModelSerializer):
     organizer = serializers.PrimaryKeyRelatedField(read_only=True)

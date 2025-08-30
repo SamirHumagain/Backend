@@ -9,9 +9,12 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     agreeToTerms = serializers.BooleanField(required=False)  # Optional validation
     role = serializers.CharField(required=False, default='user')
 
+    address = serializers.CharField(required=False, allow_blank=True)
+    phone = serializers.CharField(required=False, allow_blank=True)
+
     class Meta:
         model = CustomUser
-        fields = ['name', 'email', 'password', 'confirmPassword', 'agreeToTerms', 'role']
+        fields = ['name', 'email', 'password', 'confirmPassword', 'agreeToTerms', 'role', 'address', 'phone']
 
     def validate(self, attrs):
         if attrs['password'] != attrs['confirmPassword']:
@@ -24,10 +27,14 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         role = validated_data.pop('role', 'user')
         validated_data.pop('confirmPassword')
         validated_data.pop('agreeToTerms', None)
+        address = validated_data.pop('address', '')
+        phone = validated_data.pop('phone', '')
         user = CustomUser.objects.create_user(
             name=validated_data['name'],
             email=validated_data.get('email'),
-            password=validated_data['password']
+            password=validated_data['password'],
+            address=address,
+            phone=phone
         )
         user.user_type = role
         user.save()
@@ -41,9 +48,12 @@ class OwnerRegisterSerializer(serializers.ModelSerializer):
     confirmPassword = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
     agreeToTerms = serializers.BooleanField(required=True)
 
+    address = serializers.CharField(required=False, allow_blank=True)
+    phone = serializers.CharField(required=False, allow_blank=True)
+
     class Meta:
         model = CustomUser
-        fields = ['name', 'email', 'password', 'confirmPassword', 'agreeToTerms']
+        fields = ['name', 'email', 'password', 'confirmPassword', 'agreeToTerms', 'address', 'phone']
 
     def validate(self, attrs):
         if attrs['password'] != attrs['confirmPassword']:
@@ -55,10 +65,14 @@ class OwnerRegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop('confirmPassword')
         validated_data.pop('agreeToTerms', None)
+        address = validated_data.pop('address', '')
+        phone = validated_data.pop('phone', '')
         user = CustomUser.objects.create_user(
             name=validated_data['name'],
             email=validated_data['email'],
             password=validated_data['password'],
+            address=address,
+            phone=phone
         )
         user.user_type = 'venue_owner' 
         user.save()
