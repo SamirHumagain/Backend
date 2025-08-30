@@ -14,6 +14,8 @@ class Venue(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='owned_venues')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    average_rating = models.FloatField(default=0.0)
+
 
     def __str__(self):
         return self.name
