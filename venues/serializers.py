@@ -6,9 +6,23 @@ from loginsignup.owner_detail_serializer import OwnerDetailSerializer
 
 # --- Serializers for VenueRating and FavoriteVenue ---
 class VenueSerializer(serializers.ModelSerializer):
+    rating = serializers.SerializerMethodField()
+
     class Meta:
         model = Venue
         fields = '__all__'
+
+    def get_rating(self, obj):
+        # Defensive: ensure related_name is correct and print for debug
+        ratings = getattr(obj, 'ratings', None)
+        if ratings is None:
+            print(f"[DEBUG] Venue {obj.id} has no 'ratings' related_name. Check VenueRating model.")
+            return 0
+        ratings_qs = ratings.all()
+        print(f"[DEBUG] Venue {obj.id} ratings count: {ratings_qs.count()}")
+        if ratings_qs.exists():
+            return round(sum(r.rating for r in ratings_qs) / ratings_qs.count(), 2)
+        return 0
 class VenueRatingSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(read_only=True)
     venue = serializers.PrimaryKeyRelatedField(queryset=Venue.objects.all())
@@ -86,11 +100,7 @@ from .models import Venue, Event, Reservation, Service
 
 from loginsignup.owner_detail_serializer import OwnerDetailSerializer
 
-class VenueSerializer(serializers.ModelSerializer):
-    owner = OwnerDetailSerializer(read_only=True)
-    class Meta:
-        model = Venue
-        fields = '__all__'
+
 
 class EventSerializer(serializers.ModelSerializer):
     organizer = serializers.PrimaryKeyRelatedField(read_only=True)
