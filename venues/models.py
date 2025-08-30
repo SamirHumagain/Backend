@@ -1,3 +1,4 @@
+
 from django.db import models
 from django.conf import settings
 
@@ -11,6 +12,7 @@ class Venue(models.Model):
     eventType = models.CharField(max_length=100, default="General")
     lat = models.FloatField(default=0)
     lng = models.FloatField(default=0)
+    location_name = models.CharField(max_length=255, blank=True, default="")
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='owned_venues')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -31,7 +33,6 @@ class Event(models.Model):
         return self.name
 
 class Reservation(models.Model):
-
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reservations')
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='reservations')
     reserved_at = models.DateTimeField(auto_now_add=True)
@@ -48,4 +49,30 @@ class Service(models.Model):
 
     def __str__(self):
         return self.name
+
+# --- New models for ratings and favorites ---
+class VenueRating(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='venue_ratings')
+    venue = models.ForeignKey(Venue, on_delete=models.CASCADE, related_name='ratings')
+    rating = models.PositiveSmallIntegerField()  # 1-5 stars
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'venue')  # One rating per user per venue
+
+    def __str__(self):
+        return f"{self.user.email} - {self.venue.name} - {self.rating}"
+
+class FavoriteVenue(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='favorite_venues')
+    venue = models.ForeignKey(Venue, on_delete=models.CASCADE, related_name='favorited_by')
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'venue')  # One favorite per user per venue
+
+    def __str__(self):
+        return f"{self.user.email} - {self.venue.name}"
 

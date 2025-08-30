@@ -1,3 +1,64 @@
+
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from .models import VenueRating, FavoriteVenue
+from .serializers import VenueRatingSerializer, FavoriteVenueSerializer
+
+# --- Venue Rating API ---
+from rest_framework import mixins
+from rest_framework import status
+from rest_framework.decorators import action
+
+class VenueRatingViewSet(viewsets.ModelViewSet):
+    queryset = VenueRating.objects.all()
+    serializer_class = VenueRatingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Only allow users to see their own ratings, or filter by venue
+        user = self.request.user
+        venue_id = self.request.query_params.get('venue')
+        qs = VenueRating.objects.all()
+        if venue_id:
+            qs = qs.filter(venue_id=venue_id)
+        return qs.filter(user=user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(user=self.request.user)
+
+# --- Favorite Venue API ---
+class FavoriteVenueViewSet(viewsets.ModelViewSet):
+    queryset = FavoriteVenue.objects.all()
+    serializer_class = FavoriteVenueSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Only allow users to see their own favorites
+        user = self.request.user
+        return FavoriteVenue.objects.filter(user=user)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        venue = serializer.validated_data.get('venue')
+        if FavoriteVenue.objects.filter(user=user, venue=venue).exists():
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'detail': 'Venue already in favorites.'})
+        serializer.save(user=user)
+
+    def perform_update(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def venues(self, request):
+        # List all favorite venues for the user
+        favorites = self.get_queryset()
+        venues = [fav.venue for fav in favorites]
+        from .serializers import VenueSerializer
+        serializer = VenueSerializer(venues, many=True)
+        return Response(serializer.data)
 import math
 
 # Haversine formula utility
@@ -109,9 +170,13 @@ class AdminAnalyticsStats(APIView):
 
 
 class VenueViewSet(viewsets.ModelViewSet):
+
     queryset = Venue.objects.all()
     serializer_class = VenueSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
 
 class EventViewSet(viewsets.ModelViewSet):
     queryset = Event.objects.all()
