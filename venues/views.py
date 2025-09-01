@@ -241,7 +241,25 @@ class ReservationViewSet(viewsets.ModelViewSet):
         if Reservation.objects.filter(event=event, status='approved').exists():
             return Response({'error': 'This event is already reserved.'}, status=400)
 
-        return super().create(request, *args, **kwargs)
+        response = super().create(request, *args, **kwargs)
+        # Send email to user notifying booking request sent
+        try:
+            reservation_id = response.data.get('id')
+            reservation = Reservation.objects.get(id=reservation_id)
+            user = reservation.user
+            event = reservation.event
+            venue = event.venue
+            from django.core.mail import send_mail
+            send_mail(
+                'Your Venue Booking Request is Sent',
+                f'Hi {user.name}, your request for {venue.name} on {event.date.strftime('%Y-%m-%d')} is sent. Please wait for confirmation.',
+                'noreply@yourdomain.com',
+                [user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+        return response
 
     # Custom actions for approval/rejection
     from rest_framework.decorators import action
