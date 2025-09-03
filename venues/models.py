@@ -45,36 +45,34 @@ class Reservation(models.Model):
 
 class Service(models.Model):
     name = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
+
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    venue = models.ForeignKey(Venue, on_delete=models.CASCADE, related_name='services')
 
-    def __str__(self):
-        return self.name
 
-# --- New models for ratings and favorites ---
-class VenueRating(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='venue_ratings')
-    venue = models.ForeignKey(Venue, on_delete=models.CASCADE, related_name='ratings')
-    rating = models.PositiveSmallIntegerField()  # 1-5 stars
-    comment = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ('user', 'venue')  # One rating per user per venue
-
-    def __str__(self):
-        return f"{self.user.email} - {self.venue.name} - {self.rating}"
 
 class FavoriteVenue(models.Model):
+    added_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='favorite_venues')
     venue = models.ForeignKey(Venue, on_delete=models.CASCADE, related_name='favorited_by')
-    added_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('user', 'venue')  # One favorite per user per venue
+        unique_together = ('user', 'venue')
 
     def __str__(self):
         return f"{self.user.email} - {self.venue.name}"
+
+
+class VenueRating(models.Model):
+    rating = models.PositiveSmallIntegerField()
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='venue_ratings')
+    venue = models.ForeignKey(Venue, on_delete=models.CASCADE, related_name='ratings')
+
+    class Meta:
+        unique_together = ('user', 'venue')
+
+    def __str__(self):
+        return f"{self.user.email} - {self.venue.name} ({self.rating})"
 
