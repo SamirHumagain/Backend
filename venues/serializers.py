@@ -1,21 +1,31 @@
 
 # All imports at the very top
 from rest_framework import serializers
-from .models import Venue, Event, Reservation, Service, VenueRating, FavoriteVenue
+from .models import Venue, Event, Reservation, Service, VenueRating, FavoriteVenue, VenueImage
 from loginsignup.owner_detail_serializer import OwnerDetailSerializer
 
 # --- Serializers for VenueRating and FavoriteVenue ---
 
 class VenueSerializer(serializers.ModelSerializer):
+
     rating = serializers.SerializerMethodField()
     bookings_count = serializers.IntegerField(required=False)
     pending_requests = serializers.IntegerField(required=False)
     avg_rating = serializers.SerializerMethodField(read_only=True)
-
+    services = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
 
     class Meta:
         model = Venue
         fields = '__all__'
+
+    def get_services(self, obj):
+        from .serializers import ServiceSerializer
+        return ServiceSerializer(obj.services.all(), many=True).data
+
+    def get_images(self, obj):
+        from .serializers import VenueImageSerializer
+        return VenueImageSerializer(obj.images.all(), many=True).data
 
     def get_avg_rating(self, obj):
         avg = getattr(obj, "avg_rating", None)
@@ -124,6 +134,12 @@ class ReservationSerializer(serializers.ModelSerializer):
 class ServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
+        fields = '__all__'
+
+# VenueImage serializer
+class VenueImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VenueImage
         fields = '__all__'
 
 

@@ -4,7 +4,7 @@ from .views import (VenueViewSet, EventViewSet, ReservationViewSet, ServiceViewS
                     AdminDashboardStats, AdminUserList, AdminVenueList, AdminBookingList,
                     UserDashboardStats, UserBookingList, UserProfile, AdminAnalyticsStats,
                     OwnerVenueBookingList, haversine_api,
-                    VenueRatingViewSet, FavoriteVenueViewSet)
+                    VenueRatingViewSet, FavoriteVenueViewSet, VenueImageViewSet)
 from .admin_user_detail import AdminUserDetail
 
 
@@ -13,6 +13,7 @@ router.register(r'venues', VenueViewSet)
 router.register(r'events', EventViewSet)
 router.register(r'reservations', ReservationViewSet)
 router.register(r'services', ServiceViewSet)
+router.register(r'venue-images', VenueImageViewSet)
 router.register(r'venue-ratings', VenueRatingViewSet, basename='venue-rating')
 router.register(r'favorite-venues', FavoriteVenueViewSet, basename='favorite-venue')
 

@@ -9,7 +9,6 @@ class Venue(models.Model):
     description = models.TextField(blank=True)
     capacity = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    eventType = models.CharField(max_length=100, default="General")
     lat = models.FloatField(default=0)
     lng = models.FloatField(default=0)
     location_name = models.CharField(max_length=255, blank=True, default="")
@@ -44,9 +43,16 @@ class Reservation(models.Model):
         return f"{self.user.email} - {self.event.name}"
 
 class Service(models.Model):
-    name = models.CharField(max_length=255)
 
+    venue = models.ForeignKey(Venue, on_delete=models.CASCADE, related_name='services', null=True, blank=True)
+    name = models.CharField(max_length=255)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+
+
+# VenueImage model for multiple images per venue
+class VenueImage(models.Model):
+    venue = models.ForeignKey(Venue, on_delete=models.CASCADE, related_name='images')
+    image = models.URLField(max_length=500)
 
 
 

@@ -113,8 +113,8 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.db.models import Sum, Count, Avg
 from datetime import datetime, timedelta
 
-from .models import Venue, Event, Reservation, Service
-from .serializers import VenueSerializer, EventSerializer, ReservationSerializer, ServiceSerializer, ReservationUserDashboardSerializer, AdminBookingSerializer
+from .models import Venue, Event, Reservation, Service, VenueImage
+from .serializers import VenueSerializer, EventSerializer, ReservationSerializer, ServiceSerializer, ReservationUserDashboardSerializer, AdminBookingSerializer, VenueImageSerializer
 from loginsignup.models import CustomUser
 
 class AdminAnalyticsStats(APIView):
@@ -309,10 +309,50 @@ class ReservationViewSet(viewsets.ModelViewSet):
         )
         return Response({'status': 'rejected'})
 
+
+
+
+# ServiceViewSet
 class ServiceViewSet(viewsets.ModelViewSet):
     queryset = Service.objects.all()
     serializer_class = ServiceSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        venue_id = self.request.query_params.get('venue')
+        qs = Service.objects.all()
+        if venue_id:
+            qs = qs.filter(venue_id=venue_id)
+        return qs
+
+    def perform_create(self, serializer):
+        venue_id = self.request.data.get('venue')
+        venue = Venue.objects.get(id=venue_id)
+        if self.request.user != venue.owner:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('You are not the owner of this venue.')
+        serializer.save(venue=venue)
+
+# VenueImageViewSet
+class VenueImageViewSet(viewsets.ModelViewSet):
+    queryset = VenueImage.objects.all()
+    serializer_class = VenueImageSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        venue_id = self.request.query_params.get('venue')
+        qs = VenueImage.objects.all()
+        if venue_id:
+            qs = qs.filter(venue_id=venue_id)
+        return qs
+
+    def perform_create(self, serializer):
+        venue_id = self.request.data.get('venue')
+        venue = Venue.objects.get(id=venue_id)
+        if self.request.user != venue.owner:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('You are not the owner of this venue.')
+        serializer.save(venue=venue)
 
 class AdminDashboardStats(APIView):
     permission_classes = [IsAdminUser]
