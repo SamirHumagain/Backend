@@ -230,6 +230,17 @@ class ReservationViewSet(viewsets.ModelViewSet):
         except Event.DoesNotExist:
             return Response({'error': 'Event not found.'}, status=404)
 
+        user = request.user
+
+        # Prevent same user from sending multiple requests for same venue/date/event
+        existing_pending = Reservation.objects.filter(
+            user=user,
+            event__venue=event.venue,
+            event__date=event.date,
+            status='pending'
+        ).exists()
+        if existing_pending:
+            return Response({'error': 'You have already sent a booking request for this venue and date.'}, status=400)
 
         # Only block if there is an event for this venue/date with an approved reservation
         same_venue_events = Event.objects.filter(venue=event.venue, date=event.date).exclude(id=event.id)
