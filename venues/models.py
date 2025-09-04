@@ -2,6 +2,14 @@
 from django.db import models
 from django.conf import settings
 
+class EventType(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    label = models.CharField(max_length=100)
+    venue = models.ForeignKey('Venue', on_delete=models.CASCADE, related_name='event_types')
+
+    def __str__(self):
+        return self.label
+
 class Venue(models.Model):
     image = models.URLField(max_length=500, default="https://example.com/default-image.jpg")
     status = models.CharField(max_length=50, default="pending")
@@ -17,9 +25,24 @@ class Venue(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     average_rating = models.FloatField(default=0.0)
 
-
     def __str__(self):
         return self.name
+
+# CateringItem as a top-level model
+class CateringItem(models.Model):
+    SNACK = 'snack'
+    MAIN_COURSE = 'main_course'
+    TYPE_CHOICES = [
+        (SNACK, 'Snack'),
+        (MAIN_COURSE, 'Main Course'),
+    ]
+    name = models.CharField(max_length=100)
+    price = models.DecimalField(max_digits=8, decimal_places=2)
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    venue = models.ForeignKey(Venue, related_name='catering_items', on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.name} ({self.get_type_display()})"
 
 class Event(models.Model):
     name = models.CharField(max_length=255)

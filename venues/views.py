@@ -1,3 +1,48 @@
+from rest_framework import permissions
+from rest_framework import generics
+from rest_framework import viewsets
+from .models import EventType
+from .serializers import EventTypeSerializer
+
+# EventType API views
+class EventTypeViewSet(viewsets.ModelViewSet):
+    queryset = EventType.objects.all()
+    serializer_class = EventTypeSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        venue_id = self.request.query_params.get('venue')
+        qs = EventType.objects.all()
+        if venue_id:
+            qs = qs.filter(venue_id=venue_id)
+        return qs
+
+    def perform_create(self, serializer):
+        venue_id = self.request.data.get('venue')
+        venue = Venue.objects.get(id=venue_id)
+        if self.request.user != venue.owner:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('You are not the owner of this venue.')
+        serializer.save(venue=venue)
+from .models import CateringItem
+from .serializers import CateringItemSerializer
+
+# CateringItem API views
+class CateringItemListCreateView(generics.ListCreateAPIView):
+    serializer_class = CateringItemSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        venue_id = self.kwargs.get('venue_id')
+        return CateringItem.objects.filter(venue_id=venue_id)
+
+    def perform_create(self, serializer):
+        serializer.save(venue_id=self.kwargs.get('venue_id'))
+
+class CateringItemDeleteView(generics.DestroyAPIView):
+    queryset = CateringItem.objects.all()
+    serializer_class = CateringItemSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -245,32 +290,9 @@ class ReservationViewSet(viewsets.ModelViewSet):
         # Only block if there is an event for this venue/date with an approved reservation
         same_venue_events = Event.objects.filter(venue=event.venue, date=event.date).exclude(id=event.id)
         for ev in same_venue_events:
-            if Reservation.objects.filter(event=ev, status='approved').exists():
+    # ...existing code...
                 return Response({'error': 'This venue is already booked for the selected date.'}, status=400)
-
-        # Only block if this event already has an approved reservation
-        if Reservation.objects.filter(event=event, status='approved').exists():
-            return Response({'error': 'This event is already reserved.'}, status=400)
-
-        response = super().create(request, *args, **kwargs)
-        # Send email to user notifying booking request sent
-        try:
-            reservation_id = response.data.get('id')
-            reservation = Reservation.objects.get(id=reservation_id)
-            user = reservation.user
-            event = reservation.event
-            venue = event.venue
-            from django.core.mail import send_mail
-            send_mail(
-                'Your Venue Booking Request is Sent',
-                f'Hi {user.name}, your request for {venue.name} on {event.date.strftime('%Y-%m-%d')} is sent. Please wait for confirmation.',
-                'noreply@yourdomain.com',
-                [user.email],
-                fail_silently=True,
-            )
-        except Exception:
-            pass
-        return response
+    # ...existing code...
 
     # Custom actions for approval/rejection
     from rest_framework.decorators import action

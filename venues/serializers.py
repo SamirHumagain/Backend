@@ -2,6 +2,7 @@
 # All imports at the very top
 from rest_framework import serializers
 from .models import Venue, Event, Reservation, Service, VenueRating, FavoriteVenue, VenueImage
+from .models import CateringItem
 from loginsignup.owner_detail_serializer import OwnerDetailSerializer
 
 # --- Serializers for VenueRating and FavoriteVenue ---
@@ -15,6 +16,9 @@ class VenueSerializer(serializers.ModelSerializer):
     services = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
 
+
+    catering_items = serializers.SerializerMethodField()
+
     class Meta:
         model = Venue
         fields = '__all__'
@@ -27,12 +31,23 @@ class VenueSerializer(serializers.ModelSerializer):
         from .serializers import VenueImageSerializer
         return VenueImageSerializer(obj.images.all(), many=True).data
 
+    def get_catering_items(self, obj):
+        from .serializers import CateringItemSerializer
+        return CateringItemSerializer(obj.catering_items.all(), many=True).data
+
+    def get_images(self, obj):
+        from .serializers import VenueImageSerializer
+        return VenueImageSerializer(obj.images.all(), many=True).data
+
     def get_avg_rating(self, obj):
         avg = getattr(obj, "avg_rating", None)
         if avg is None:
             return None
         return round(avg, 2)
 
+        def get_catering_items(self, obj):
+            from .serializers import CateringItemSerializer
+            return CateringItemSerializer(obj.catering_items.all(), many=True).data
     def get_rating(self, obj):
         ratings = getattr(obj, 'ratings', None)
         if ratings is None:
@@ -68,13 +83,7 @@ class AdminBookingSerializer(serializers.ModelSerializer):
     guests = serializers.SerializerMethodField()
     amount = serializers.SerializerMethodField()
 
-    class Meta:
-        model = Reservation
-        fields = [
-            'id', 'status', 'reserved_at',
-            'venue_name', 'customer_name', 'customer_email',
-            'event_date', 'guests', 'amount',
-        ]
+    # ...existing code...
 
     def get_venue_name(self, obj):
         try:
@@ -173,4 +182,17 @@ class ReservationOwnerDashboardSerializer(serializers.ModelSerializer):
                 'email': user.email,
             }
         return None
+
+class CateringItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CateringItem
+        fields = ['id', 'name', 'price', 'type', 'venue']
+
+
+# EventType serializer
+from .models import EventType
+class EventTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventType
+        fields = ['id', 'name', 'label', 'venue']
 
