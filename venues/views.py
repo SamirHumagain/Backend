@@ -85,7 +85,12 @@ class FavoriteVenueViewSet(viewsets.ModelViewSet):
     serializer_class = FavoriteVenueSerializer
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        from django.db import IntegrityError
+        from rest_framework import serializers
+        try:
+            serializer.save(user=self.request.user)
+        except IntegrityError:
+            raise serializers.ValidationError({"detail": "You have already favorited this venue."})
 from loginsignup.models import CustomUser
 
 class AdminAnalyticsStats(APIView):
