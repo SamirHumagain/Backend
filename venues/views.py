@@ -56,7 +56,7 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.db.models import Sum, Count, Avg
 from datetime import datetime, timedelta
 
-from .models import Venue, Event, Reservation, VenueRating, FavoriteVenue
+from .models import Venue, Event, Reservation, FavoriteVenue
 from .serializers import VenueSerializer, EventSerializer, ReservationSerializer, ReservationUserDashboardSerializer, AdminBookingSerializer
 # Restore VenueRatingViewSet
 from rest_framework import viewsets
@@ -64,19 +64,8 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework import status
 from rest_framework.response import Response
 
-from .serializers import VenueRatingSerializer, FavoriteVenueSerializer
+from .serializers import FavoriteVenueSerializer
 
-class VenueRatingViewSet(viewsets.ModelViewSet):
-    queryset = VenueRating.objects.all()
-    permission_classes = [IsAuthenticatedOrReadOnly]
-    serializer_class = VenueRatingSerializer
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        venue_id = self.request.query_params.get('venue')
-        if venue_id:
-            queryset = queryset.filter(venue_id=venue_id)
-        return queryset
 
 # Restore FavoriteVenueViewSet
 class FavoriteVenueViewSet(viewsets.ModelViewSet):

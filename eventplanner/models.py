@@ -4,6 +4,7 @@ from django.conf import settings
 class EventType(models.Model):
 	name = models.CharField(max_length=100, unique=True)
 	label = models.CharField(max_length=100)
+	price = models.DecimalField(max_digits=8, decimal_places=2, default=0)
 	venue = models.ForeignKey('venues.Venue', on_delete=models.CASCADE, related_name='event_types')
 
 	def __str__(self):

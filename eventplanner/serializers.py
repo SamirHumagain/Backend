@@ -14,7 +14,7 @@ class ServiceSerializer(serializers.ModelSerializer):
 class EventTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = EventType
-        fields = ['id', 'name', 'label', 'venue']
+        fields = ['id', 'name', 'label', 'price', 'venue']
 
 class VenueImageSerializer(serializers.ModelSerializer):
     class Meta:

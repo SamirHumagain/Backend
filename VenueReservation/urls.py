@@ -33,5 +33,6 @@ urlpatterns = [
     path('api/', include('venues.urls')),
     path('api/eventplanner/', include('eventplanner.urls')),
     path('api/khalti/', include('khalti.urls')),
+    path('api/', include('rating.urls')),
 ]
 
