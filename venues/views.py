@@ -1,109 +1,7 @@
 from rest_framework import permissions
+from rest_framework import serializers
 from rest_framework import generics
 from rest_framework import viewsets
-from .models import EventType
-from .serializers import EventTypeSerializer
-
-# EventType API views
-class EventTypeViewSet(viewsets.ModelViewSet):
-    queryset = EventType.objects.all()
-    serializer_class = EventTypeSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-
-    def get_queryset(self):
-        venue_id = self.request.query_params.get('venue')
-        qs = EventType.objects.all()
-        if venue_id:
-            qs = qs.filter(venue_id=venue_id)
-        return qs
-
-    def perform_create(self, serializer):
-        venue_id = self.request.data.get('venue')
-        venue = Venue.objects.get(id=venue_id)
-        if self.request.user != venue.owner:
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied('You are not the owner of this venue.')
-        serializer.save(venue=venue)
-from .models import CateringItem
-from .serializers import CateringItemSerializer
-
-# CateringItem API views
-class CateringItemListCreateView(generics.ListCreateAPIView):
-    serializer_class = CateringItemSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-
-    def get_queryset(self):
-        venue_id = self.kwargs.get('venue_id')
-        return CateringItem.objects.filter(venue_id=venue_id)
-
-    def perform_create(self, serializer):
-        serializer.save(venue_id=self.kwargs.get('venue_id'))
-
-class CateringItemDeleteView(generics.DestroyAPIView):
-    queryset = CateringItem.objects.all()
-    serializer_class = CateringItemSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
-from .models import VenueRating, FavoriteVenue
-from .serializers import VenueRatingSerializer, FavoriteVenueSerializer
-
-# --- Venue Rating API ---
-from rest_framework import mixins
-from rest_framework import status
-from rest_framework.decorators import action
-
-class VenueRatingViewSet(viewsets.ModelViewSet):
-    queryset = VenueRating.objects.all()
-    serializer_class = VenueRatingSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        # Only allow users to see their own ratings, or filter by venue
-        user = self.request.user
-        venue_id = self.request.query_params.get('venue')
-        qs = VenueRating.objects.all()
-        if venue_id:
-            qs = qs.filter(venue_id=venue_id)
-        return qs.filter(user=user)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-    def perform_update(self, serializer):
-        serializer.save(user=self.request.user)
-
-# --- Favorite Venue API ---
-class FavoriteVenueViewSet(viewsets.ModelViewSet):
-    queryset = FavoriteVenue.objects.all()
-    serializer_class = FavoriteVenueSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        # Only allow users to see their own favorites
-        user = self.request.user
-        return FavoriteVenue.objects.filter(user=user)
-
-    def perform_create(self, serializer):
-        user = self.request.user
-        venue = serializer.validated_data.get('venue')
-        if FavoriteVenue.objects.filter(user=user, venue=venue).exists():
-            from rest_framework.exceptions import ValidationError
-            raise ValidationError({'detail': 'Venue already in favorites.'})
-        serializer.save(user=user)
-
-    def perform_update(self, serializer):
-        serializer.save(user=self.request.user)
-
-    @action(detail=False, methods=['get'])
-    def venues(self, request):
-        # List all favorite venues for the user
-        favorites = self.get_queryset()
-        venues = [fav.venue for fav in favorites]
-        from .serializers import VenueSerializer
-        serializer = VenueSerializer(venues, many=True)
-        return Response(serializer.data)
 import math
 
 # Haversine formula utility
@@ -147,8 +45,8 @@ class OwnerVenueBookingList(APIView):
         venues = Venue.objects.filter(owner=owner)
         events = Event.objects.filter(venue__in=venues)
         bookings = Reservation.objects.filter(event__in=events).select_related('event', 'user')
-        from .serializers import ReservationOwnerDashboardSerializer
-        serializer = ReservationOwnerDashboardSerializer(bookings, many=True)
+        from .serializers import ReservationUserDashboardSerializer
+        serializer = ReservationUserDashboardSerializer(bookings, many=True)
         return Response(serializer.data)
 
 from rest_framework import viewsets, permissions
@@ -158,8 +56,36 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.db.models import Sum, Count, Avg
 from datetime import datetime, timedelta
 
-from .models import Venue, Event, Reservation, Service, VenueImage
-from .serializers import VenueSerializer, EventSerializer, ReservationSerializer, ServiceSerializer, ReservationUserDashboardSerializer, AdminBookingSerializer, VenueImageSerializer
+from .models import Venue, Event, Reservation, VenueRating, FavoriteVenue
+from .serializers import VenueSerializer, EventSerializer, ReservationSerializer, ReservationUserDashboardSerializer, AdminBookingSerializer
+# Restore VenueRatingViewSet
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework import status
+from rest_framework.response import Response
+
+from .serializers import VenueRatingSerializer, FavoriteVenueSerializer
+
+class VenueRatingViewSet(viewsets.ModelViewSet):
+    queryset = VenueRating.objects.all()
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    serializer_class = VenueRatingSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        venue_id = self.request.query_params.get('venue')
+        if venue_id:
+            queryset = queryset.filter(venue_id=venue_id)
+        return queryset
+
+# Restore FavoriteVenueViewSet
+class FavoriteVenueViewSet(viewsets.ModelViewSet):
+    queryset = FavoriteVenue.objects.all()
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    serializer_class = FavoriteVenueSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 from loginsignup.models import CustomUser
 
 class AdminAnalyticsStats(APIView):
@@ -345,47 +271,7 @@ class ReservationViewSet(viewsets.ModelViewSet):
 
 
 
-# ServiceViewSet
-class ServiceViewSet(viewsets.ModelViewSet):
-    queryset = Service.objects.all()
-    serializer_class = ServiceSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
-    def get_queryset(self):
-        venue_id = self.request.query_params.get('venue')
-        qs = Service.objects.all()
-        if venue_id:
-            qs = qs.filter(venue_id=venue_id)
-        return qs
-
-    def perform_create(self, serializer):
-        venue_id = self.request.data.get('venue')
-        venue = Venue.objects.get(id=venue_id)
-        if self.request.user != venue.owner:
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied('You are not the owner of this venue.')
-        serializer.save(venue=venue)
-
-# VenueImageViewSet
-class VenueImageViewSet(viewsets.ModelViewSet):
-    queryset = VenueImage.objects.all()
-    serializer_class = VenueImageSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-
-    def get_queryset(self):
-        venue_id = self.request.query_params.get('venue')
-        qs = VenueImage.objects.all()
-        if venue_id:
-            qs = qs.filter(venue_id=venue_id)
-        return qs
-
-    def perform_create(self, serializer):
-        venue_id = self.request.data.get('venue')
-        venue = Venue.objects.get(id=venue_id)
-        if self.request.user != venue.owner:
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied('You are not the owner of this venue.')
-        serializer.save(venue=venue)
 
 class AdminDashboardStats(APIView):
     permission_classes = [IsAdminUser]

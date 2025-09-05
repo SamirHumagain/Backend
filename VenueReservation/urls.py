@@ -25,11 +25,12 @@ from django.contrib import admin
 from django.urls import path ,include
 
 
+
 urlpatterns = [
     path('', home),
     path('admin/', admin.site.urls),
     path('api/auth/', include('loginsignup.urls')),
     path('api/', include('venues.urls')),
-
+    path('api/eventplanner/', include('eventplanner.urls')),
 ]
 
