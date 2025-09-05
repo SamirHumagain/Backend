@@ -32,5 +32,6 @@ urlpatterns = [
     path('api/auth/', include('loginsignup.urls')),
     path('api/', include('venues.urls')),
     path('api/eventplanner/', include('eventplanner.urls')),
+    path('api/khalti/', include('khalti.urls')),
 ]
 
