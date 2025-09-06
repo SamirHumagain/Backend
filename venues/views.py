@@ -201,7 +201,14 @@ class EventViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        serializer.save(organizer=self.request.user)
+            venue_id = self.request.data.get('venue')
+            if not venue_id:
+                raise serializers.ValidationError({'venue': 'This field is required.'})
+            try:
+                venue = Venue.objects.get(id=venue_id)
+            except Venue.DoesNotExist:
+                raise serializers.ValidationError({'venue': 'Venue not found.'})
+            serializer.save(organizer=self.request.user, venue=venue)
 
 class ReservationViewSet(viewsets.ModelViewSet):
 
