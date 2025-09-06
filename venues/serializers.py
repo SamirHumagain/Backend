@@ -4,23 +4,29 @@ from .models import Venue, Event, Reservation, FavoriteVenue
 from eventplanner.serializers import VenueImageSerializer
 from loginsignup.owner_detail_serializer import OwnerDetailSerializer
 
+
 class VenueSerializer(serializers.ModelSerializer):
     bookings_count = serializers.IntegerField(required=False)
     pending_requests = serializers.IntegerField(required=False)
     bayesian_rating = serializers.SerializerMethodField(read_only=True)
     images = VenueImageSerializer(many=True, read_only=True)
     owner_details = OwnerDetailSerializer(source='owner', read_only=True)
+    num_ratings = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Venue
         fields = '__all__'
-        # Add owner_details to output
-        extra_fields = ['owner_details']
+        # Add owner_details and num_ratings to output
+        extra_fields = ['owner_details', 'num_ratings']
 
     def get_bayesian_rating(self, obj):
         from rating.models import VenueRating
         bayesian = VenueRating.update_bayesian_for_venue(obj)
         return round(bayesian['bayesian_rating'], 2)
+
+    def get_num_ratings(self, obj):
+        # Return the number of ratings for this venue
+        return obj.ratings.count() if hasattr(obj, 'ratings') else 0
 
 class EventSerializer(serializers.ModelSerializer):
     venue = VenueSerializer(read_only=True)

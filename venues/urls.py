@@ -16,6 +16,7 @@ router.register(r'reservations', ReservationViewSet)
 router.register(r'favorite-venues', FavoriteVenueViewSet, basename='favorite-venue')
 
 urlpatterns = [
+    path('venues/recommended/', recommended_venues, name='recommended-venues'),
     path('venues/owner/',
          VenueViewSet.as_view({'get': 'list'}),
          name='owner-venue-list'),
@@ -31,5 +32,4 @@ urlpatterns = [
     path('venues/owner/bookings/', OwnerVenueBookingList.as_view(), name='owner-venue-bookings'),
     path('users/<int:user_id>/', AdminUserDetail.as_view(), name='admin-user-detail'),
     path('haversine/', haversine_api, name='haversine-api'),
-    path('venues/recommended/', recommended_venues, name='recommended-venues'),
 ]
