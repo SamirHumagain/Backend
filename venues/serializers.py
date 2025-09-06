@@ -23,6 +23,7 @@ class VenueSerializer(serializers.ModelSerializer):
         return round(bayesian['bayesian_rating'], 2)
 
 class EventSerializer(serializers.ModelSerializer):
+    venue = VenueSerializer(read_only=True)
     organizer = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
         model = Event
@@ -36,6 +37,7 @@ class ReservationSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ReservationUserDashboardSerializer(serializers.ModelSerializer):
+    event = EventSerializer(read_only=True)
     class Meta:
         model = Reservation
         fields = '__all__'
@@ -49,9 +51,6 @@ class FavoriteVenueSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
         model = FavoriteVenue
-        fields = '__all__'
-        model = Reservation
-
         fields = '__all__'
 
 

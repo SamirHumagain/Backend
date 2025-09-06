@@ -2,6 +2,7 @@ from rest_framework import permissions
 from rest_framework import serializers
 from rest_framework import generics
 from rest_framework import viewsets
+from rest_framework.decorators import action
 import math
 
 # Haversine formula utility
@@ -210,13 +211,15 @@ class ReservationViewSet(viewsets.ModelViewSet):
         # Only block if there is an event for this venue/date with an approved reservation
         same_venue_events = Event.objects.filter(venue=event.venue, date=event.date).exclude(id=event.id)
         for ev in same_venue_events:
-    # ...existing code...
+            approved = Reservation.objects.filter(event=ev, status='approved').exists()
+            if approved:
                 return Response({'error': 'This venue is already booked for the selected date.'}, status=400)
-    # ...existing code...
 
-    # Custom actions for approval/rejection
-    from rest_framework.decorators import action
-    from rest_framework import status
+        # Create reservation
+        reservation = Reservation.objects.create(user=user, event=event, status='pending')
+        from .serializers import ReservationSerializer
+        serializer = ReservationSerializer(reservation)
+        return Response(serializer.data, status=201)
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def approve(self, request, pk=None):
