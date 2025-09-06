@@ -8,6 +8,14 @@ from .serializers import VenueRatingSerializer
 from venues.models import Venue
 
 class VenueRatingViewSet(viewsets.ModelViewSet):
+    def has_approved_reservation(self, user, venue):
+        # Check if user has an approved reservation for any event at this venue
+        from venues.models import Reservation, Event
+        return Reservation.objects.filter(
+            user=user,
+            status='approved',
+            event__venue=venue
+        ).exists()
     queryset = VenueRating.objects.all()
     permission_classes = [IsAuthenticatedOrReadOnly]
     serializer_class = VenueRatingSerializer
@@ -20,14 +28,21 @@ class VenueRatingViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        rating_obj = serializer.save(user=self.request.user)
-        venue = rating_obj.venue
-    # Bayesian rating is calculated, but not saved to Venue model
+        user = self.request.user
+        venue = serializer.validated_data['venue']
+        if not self.has_approved_reservation(user, venue):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Booking approval is required to rate this venue.")
+        rating_obj = serializer.save(user=user)
+        # venue = rating_obj.venue
 
     def perform_update(self, serializer):
+        user = self.request.user
+        venue = serializer.validated_data['venue']
+        if not self.has_approved_reservation(user, venue):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Booking approval is required to rate this venue.")
         rating_obj = serializer.save()
-        venue = rating_obj.venue
-    # Bayesian rating is calculated, but not saved to Venue model
 
     def perform_destroy(self, instance):
         venue = instance.venue
