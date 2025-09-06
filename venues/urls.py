@@ -5,6 +5,7 @@ from .views import (VenueViewSet, EventViewSet, ReservationViewSet,
                     UserDashboardStats, UserBookingList, UserProfile, AdminAnalyticsStats,
                     OwnerVenueBookingList, haversine_api,
                     FavoriteVenueViewSet)
+from .views import recommended_venues
 from .admin_user_detail import AdminUserDetail
 
 
@@ -30,4 +31,5 @@ urlpatterns = [
     path('venues/owner/bookings/', OwnerVenueBookingList.as_view(), name='owner-venue-bookings'),
     path('users/<int:user_id>/', AdminUserDetail.as_view(), name='admin-user-detail'),
     path('haversine/', haversine_api, name='haversine-api'),
+    path('venues/recommended/', recommended_venues, name='recommended-venues'),
 ]

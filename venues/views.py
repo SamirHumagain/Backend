@@ -67,6 +67,29 @@ from rest_framework.response import Response
 
 from .serializers import FavoriteVenueSerializer
 
+# Recommended venues API
+from rating.models import VenueRating
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def recommended_venues(request):
+    venues = Venue.objects.all()
+    # Calculate Bayesian rating for each venue
+    venue_list = []
+    for venue in venues:
+        bayesian = VenueRating.update_bayesian_for_venue(venue)
+        venue_list.append({
+            'venue': venue,
+            'bayesian_rating': bayesian['bayesian_rating']
+        })
+    # Sort venues by bayesian_rating descending
+    sorted_venues = sorted(venue_list, key=lambda x: x['bayesian_rating'], reverse=True)
+    # Take top N (e.g., 5)
+    top_venues = [v['venue'] for v in sorted_venues[:5]]
+    serializer = VenueSerializer(top_venues, many=True)
+    return Response(serializer.data)
+
 
 # Restore FavoriteVenueViewSet
 class FavoriteVenueViewSet(viewsets.ModelViewSet):
