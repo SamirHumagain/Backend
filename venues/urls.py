@@ -1,10 +1,11 @@
 from rest_framework.routers import DefaultRouter
 from django.urls import path
-from .views import (VenueViewSet, EventViewSet, ReservationViewSet, ServiceViewSet,
+from .views import (VenueViewSet, EventViewSet, ReservationViewSet,
                     AdminDashboardStats, AdminUserList, AdminVenueList, AdminBookingList,
                     UserDashboardStats, UserBookingList, UserProfile, AdminAnalyticsStats,
                     OwnerVenueBookingList, haversine_api,
-                    VenueRatingViewSet, FavoriteVenueViewSet)
+                    FavoriteVenueViewSet)
+from .views import recommended_venues
 from .admin_user_detail import AdminUserDetail
 
 
@@ -12,11 +13,10 @@ router = DefaultRouter()
 router.register(r'venues', VenueViewSet)
 router.register(r'events', EventViewSet)
 router.register(r'reservations', ReservationViewSet)
-router.register(r'services', ServiceViewSet)
-router.register(r'venue-ratings', VenueRatingViewSet, basename='venue-rating')
 router.register(r'favorite-venues', FavoriteVenueViewSet, basename='favorite-venue')
 
 urlpatterns = [
+    path('venues/recommended/', recommended_venues, name='recommended-venues'),
     path('venues/owner/',
          VenueViewSet.as_view({'get': 'list'}),
          name='owner-venue-list'),

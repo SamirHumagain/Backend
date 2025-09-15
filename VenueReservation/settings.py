@@ -50,6 +50,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'loginsignup',
     'venues',
+    'eventplanner',
+    'rating',
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',

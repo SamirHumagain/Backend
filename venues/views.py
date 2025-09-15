@@ -1,64 +1,8 @@
-
+from rest_framework import permissions
+from rest_framework import serializers
+from rest_framework import generics
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
-from .models import VenueRating, FavoriteVenue
-from .serializers import VenueRatingSerializer, FavoriteVenueSerializer
-
-# --- Venue Rating API ---
-from rest_framework import mixins
-from rest_framework import status
 from rest_framework.decorators import action
-
-class VenueRatingViewSet(viewsets.ModelViewSet):
-    queryset = VenueRating.objects.all()
-    serializer_class = VenueRatingSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        # Only allow users to see their own ratings, or filter by venue
-        user = self.request.user
-        venue_id = self.request.query_params.get('venue')
-        qs = VenueRating.objects.all()
-        if venue_id:
-            qs = qs.filter(venue_id=venue_id)
-        return qs.filter(user=user)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-    def perform_update(self, serializer):
-        serializer.save(user=self.request.user)
-
-# --- Favorite Venue API ---
-class FavoriteVenueViewSet(viewsets.ModelViewSet):
-    queryset = FavoriteVenue.objects.all()
-    serializer_class = FavoriteVenueSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        # Only allow users to see their own favorites
-        user = self.request.user
-        return FavoriteVenue.objects.filter(user=user)
-
-    def perform_create(self, serializer):
-        user = self.request.user
-        venue = serializer.validated_data.get('venue')
-        if FavoriteVenue.objects.filter(user=user, venue=venue).exists():
-            from rest_framework.exceptions import ValidationError
-            raise ValidationError({'detail': 'Venue already in favorites.'})
-        serializer.save(user=user)
-
-    def perform_update(self, serializer):
-        serializer.save(user=self.request.user)
-
-    @action(detail=False, methods=['get'])
-    def venues(self, request):
-        # List all favorite venues for the user
-        favorites = self.get_queryset()
-        venues = [fav.venue for fav in favorites]
-        from .serializers import VenueSerializer
-        serializer = VenueSerializer(venues, many=True)
-        return Response(serializer.data)
 import math
 
 # Haversine formula utility
@@ -102,8 +46,8 @@ class OwnerVenueBookingList(APIView):
         venues = Venue.objects.filter(owner=owner)
         events = Event.objects.filter(venue__in=venues)
         bookings = Reservation.objects.filter(event__in=events).select_related('event', 'user')
-        from .serializers import ReservationOwnerDashboardSerializer
-        serializer = ReservationOwnerDashboardSerializer(bookings, many=True)
+        from .serializers import ReservationUserDashboardSerializer
+        serializer = ReservationUserDashboardSerializer(bookings, many=True)
         return Response(serializer.data)
 
 from rest_framework import viewsets, permissions
@@ -113,8 +57,53 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.db.models import Sum, Count, Avg
 from datetime import datetime, timedelta
 
-from .models import Venue, Event, Reservation, Service
-from .serializers import VenueSerializer, EventSerializer, ReservationSerializer, ServiceSerializer, ReservationUserDashboardSerializer, AdminBookingSerializer
+from .models import Venue, Event, Reservation, FavoriteVenue
+from .serializers import VenueSerializer, EventSerializer, ReservationSerializer, ReservationUserDashboardSerializer, AdminBookingSerializer
+# Restore VenueRatingViewSet
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework import status
+from rest_framework.response import Response
+
+from .serializers import FavoriteVenueSerializer
+
+# Recommended venues API
+from rating.models import VenueRating
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def recommended_venues(request):
+    venues = Venue.objects.all()
+    # Calculate Bayesian rating for each venue
+    venue_list = []
+    for venue in venues:
+        bayesian = VenueRating.update_bayesian_for_venue(venue)
+        venue_list.append({
+            'venue': venue,
+            'bayesian_rating': bayesian['bayesian_rating']
+        })
+    # Sort venues by bayesian_rating descending
+    sorted_venues = sorted(venue_list, key=lambda x: x['bayesian_rating'], reverse=True)
+    # Take top N (e.g., 5)
+    top_venues = [v['venue'] for v in sorted_venues[:5]]
+    serializer = VenueSerializer(top_venues, many=True)
+    return Response(serializer.data)
+
+
+# Restore FavoriteVenueViewSet
+class FavoriteVenueViewSet(viewsets.ModelViewSet):
+    queryset = FavoriteVenue.objects.all()
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    serializer_class = FavoriteVenueSerializer
+
+    def perform_create(self, serializer):
+        from django.db import IntegrityError
+        from rest_framework import serializers
+        try:
+            serializer.save(user=self.request.user)
+        except IntegrityError:
+            raise serializers.ValidationError({"detail": "You have already favorited this venue."})
 from loginsignup.models import CustomUser
 
 class AdminAnalyticsStats(APIView):
@@ -212,7 +201,14 @@ class EventViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        serializer.save(organizer=self.request.user)
+            venue_id = self.request.data.get('venue')
+            if not venue_id:
+                raise serializers.ValidationError({'venue': 'This field is required.'})
+            try:
+                venue = Venue.objects.get(id=venue_id)
+            except Venue.DoesNotExist:
+                raise serializers.ValidationError({'venue': 'Venue not found.'})
+            serializer.save(organizer=self.request.user, venue=venue)
 
 class ReservationViewSet(viewsets.ModelViewSet):
 
@@ -230,40 +226,30 @@ class ReservationViewSet(viewsets.ModelViewSet):
         except Event.DoesNotExist:
             return Response({'error': 'Event not found.'}, status=404)
 
+        user = request.user
+
+        # Prevent same user from sending multiple requests for same venue/date/event
+        existing_pending = Reservation.objects.filter(
+            user=user,
+            event__venue=event.venue,
+            event__date=event.date,
+            status='pending'
+        ).exists()
+        if existing_pending:
+            return Response({'error': 'You have already sent a booking request for this venue and date.'}, status=400)
 
         # Only block if there is an event for this venue/date with an approved reservation
         same_venue_events = Event.objects.filter(venue=event.venue, date=event.date).exclude(id=event.id)
         for ev in same_venue_events:
-            if Reservation.objects.filter(event=ev, status='approved').exists():
+            approved = Reservation.objects.filter(event=ev, status='approved').exists()
+            if approved:
                 return Response({'error': 'This venue is already booked for the selected date.'}, status=400)
 
-        # Only block if this event already has an approved reservation
-        if Reservation.objects.filter(event=event, status='approved').exists():
-            return Response({'error': 'This event is already reserved.'}, status=400)
-
-        response = super().create(request, *args, **kwargs)
-        # Send email to user notifying booking request sent
-        try:
-            reservation_id = response.data.get('id')
-            reservation = Reservation.objects.get(id=reservation_id)
-            user = reservation.user
-            event = reservation.event
-            venue = event.venue
-            from django.core.mail import send_mail
-            send_mail(
-                'Your Venue Booking Request is Sent',
-                f'Hi {user.name}, your request for {venue.name} on {event.date.strftime('%Y-%m-%d')} is sent. Please wait for confirmation.',
-                'noreply@yourdomain.com',
-                [user.email],
-                fail_silently=True,
-            )
-        except Exception:
-            pass
-        return response
-
-    # Custom actions for approval/rejection
-    from rest_framework.decorators import action
-    from rest_framework import status
+        # Create reservation
+        reservation = Reservation.objects.create(user=user, event=event, status='pending')
+        from .serializers import ReservationSerializer
+        serializer = ReservationSerializer(reservation)
+        return Response(serializer.data, status=201)
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def approve(self, request, pk=None):
@@ -309,10 +295,10 @@ class ReservationViewSet(viewsets.ModelViewSet):
         )
         return Response({'status': 'rejected'})
 
-class ServiceViewSet(viewsets.ModelViewSet):
-    queryset = Service.objects.all()
-    serializer_class = ServiceSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+
+
+
 
 class AdminDashboardStats(APIView):
     permission_classes = [IsAdminUser]
