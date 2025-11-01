@@ -44,14 +44,59 @@ class ReservationSerializer(serializers.ModelSerializer):
 
 class ReservationUserDashboardSerializer(serializers.ModelSerializer):
     event = EventSerializer(read_only=True)
+    # include nested user details so owner dashboard can show requester name/email
+    user = OwnerDetailSerializer(read_only=True)
     class Meta:
         model = Reservation
         fields = '__all__'
 
 class AdminBookingSerializer(serializers.ModelSerializer):
+    # Provide extra read-only fields that the admin frontend expects
+    event = EventSerializer(read_only=True)
+    customer_name = serializers.SerializerMethodField(read_only=True)
+    venue_name = serializers.SerializerMethodField(read_only=True)
+    event_date = serializers.SerializerMethodField(read_only=True)
+    amount = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Reservation
-        fields = '__all__'
+        # include core reservation fields plus convenient read-only fields
+        fields = [
+            'id',
+            'user',
+            'event',
+            'status',
+            'reserved_at',
+            'customer_name',
+            'venue_name',
+            'event_date',
+            'amount',
+        ]
+
+    def get_customer_name(self, obj):
+        # prefer name, fall back to email
+        user = getattr(obj, 'user', None)
+        if not user:
+            return None
+        return getattr(user, 'name', None) or getattr(user, 'email', '')
+
+    def get_venue_name(self, obj):
+        try:
+            return obj.event.venue.name
+        except Exception:
+            return None
+
+    def get_event_date(self, obj):
+        try:
+            return obj.event.date
+        except Exception:
+            return None
+
+    def get_amount(self, obj):
+        try:
+            return obj.event.venue.price
+        except Exception:
+            return 0
 
 class FavoriteVenueSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(read_only=True)

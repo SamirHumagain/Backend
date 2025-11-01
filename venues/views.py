@@ -4,6 +4,10 @@ from rest_framework import generics
 from rest_framework import viewsets
 from rest_framework.decorators import action
 import math
+import logging
+
+from django.core.mail import send_mail
+from django.conf import settings
 
 # Haversine formula utility
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -249,6 +253,28 @@ class ReservationViewSet(viewsets.ModelViewSet):
         reservation = Reservation.objects.create(user=user, event=event, status='pending')
         from .serializers import ReservationSerializer
         serializer = ReservationSerializer(reservation)
+        # Notify venue owner by email about the new booking request
+        try:
+            owner = event.venue.owner
+            owner_email = getattr(owner, 'email', None)
+            if owner_email:
+                subject = f"New Booking Request for {event.venue.name}"
+                message = (
+                    f"Hi {getattr(owner, 'name', 'Owner')},\n\n"
+                    f"{getattr(user, 'name', user.email)} has requested a booking for {event.venue.name} on {event.date.strftime('%Y-%m-%d')}.\n"
+                    "Please review and approve or reject the request in your owner dashboard.\n\n"
+                    "Regards,\nVenueBook Team"
+                )
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [owner_email],
+                    fail_silently=False,
+                )
+                logging.info(f"Booking request email sent to owner {owner_email} for reservation {reservation.id}")
+        except Exception:
+            logging.exception(f"Failed to send booking request email for reservation {reservation.id}")
         return Response(serializer.data, status=201)
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
@@ -260,17 +286,20 @@ class ReservationViewSet(viewsets.ModelViewSet):
         reservation.status = 'approved'
         reservation.save()
         # Send email to user notifying approval
-        from django.core.mail import send_mail
         user = reservation.user
         event = reservation.event
         venue = event.venue
-        send_mail(
-            'Your Venue Booking is Approved',
-            f'Hi {user.name}, your booking for {venue.name} on {event.date.strftime('%Y-%m-%d')} has been approved!',
-            'noreply@yourdomain.com',
-            [user.email],
-            fail_silently=True,
-        )
+        try:
+            send_mail(
+                'Your Venue Booking is Approved',
+                f"Hi {user.name}, your booking for {venue.name} on {event.date.strftime('%Y-%m-%d')} has been approved!",
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                fail_silently=False,
+            )
+            logging.info(f"Approval email sent to {user.email} for reservation {reservation.id}")
+        except Exception:
+            logging.exception(f"Failed to send approval email for reservation {reservation.id} to {user.email}")
         return Response({'status': 'approved'})
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
@@ -282,17 +311,20 @@ class ReservationViewSet(viewsets.ModelViewSet):
         reservation.status = 'rejected'
         reservation.save()
         # Send email to user notifying rejection
-        from django.core.mail import send_mail
         user = reservation.user
         event = reservation.event
         venue = event.venue
-        send_mail(
-            'Your Venue Booking is Rejected',
-            f'Hi {user.name}, your booking for {venue.name} on {event.date.strftime('%Y-%m-%d')} has been rejected.',
-            'noreply@yourdomain.com',
-            [user.email],
-            fail_silently=True,
-        )
+        try:
+            send_mail(
+                'Your Venue Booking is Rejected',
+                f"Hi {user.name}, your booking for {venue.name} on {event.date.strftime('%Y-%m-%d')} has been rejected.",
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                fail_silently=False,
+            )
+            logging.info(f"Rejection email sent to {user.email} for reservation {reservation.id}")
+        except Exception:
+            logging.exception(f"Failed to send rejection email for reservation {reservation.id} to {user.email}")
         return Response({'status': 'rejected'})
 
 
