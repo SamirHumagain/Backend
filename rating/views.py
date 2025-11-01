@@ -38,7 +38,13 @@ class VenueRatingViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         user = self.request.user
-        venue = serializer.validated_data['venue']
+        # For partial updates (PATCH), 'venue' may not be present in validated_data.
+        # Fall back to the instance's venue when missing.
+        venue = serializer.validated_data.get('venue') if 'venue' in serializer.validated_data else getattr(serializer.instance, 'venue', None)
+        if venue is None:
+            # Defensive: if we still don't have a venue, deny update.
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Unable to determine venue for rating update.")
         if not self.has_approved_reservation(user, venue):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("Booking approval is required to rate this venue.")

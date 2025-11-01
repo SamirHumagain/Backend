@@ -23,11 +23,16 @@ class VenueRating(models.Model):
             global_avg = VenueRating.objects.aggregate(avg=Avg('rating'))['avg']
             if global_avg is None or global_avg == 0:
                 global_avg = 3.0  # fallback to neutral value if no ratings
-        # If no ratings for this venue, use global_avg
+        # If no ratings for this venue, return None so callers can
+        # treat it as "no ratings yet" instead of showing the global avg.
         if n == 0:
-            bayesian = global_avg
-        else:
-            bayesian = ((min_num * global_avg) + s) / (min_num + n)
+            return {
+                'num_ratings': 0,
+                'sum_ratings': 0,
+                'bayesian_rating': None
+            }
+        # Otherwise compute Bayesian average
+        bayesian = ((min_num * global_avg) + s) / (min_num + n)
         return {
             'num_ratings': n,
             'sum_ratings': s,

@@ -22,7 +22,8 @@ class VenueSerializer(serializers.ModelSerializer):
     def get_bayesian_rating(self, obj):
         from rating.models import VenueRating
         bayesian = VenueRating.update_bayesian_for_venue(obj)
-        return round(bayesian['bayesian_rating'], 2)
+        br = bayesian.get('bayesian_rating') if isinstance(bayesian, dict) else None
+        return round(br, 2) if br is not None else None
 
     def get_num_ratings(self, obj):
         # Return the number of ratings for this venue

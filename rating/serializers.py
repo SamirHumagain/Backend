@@ -13,4 +13,5 @@ class VenueRatingSerializer(serializers.ModelSerializer):
         # Calculate Bayesian rating for the venue of this rating
         from rating.models import VenueRating
         bayesian = VenueRating.update_bayesian_for_venue(obj.venue)
-        return round(bayesian['bayesian_rating'], 2)
+        br = bayesian.get('bayesian_rating') if isinstance(bayesian, dict) else None
+        return round(br, 2) if br is not None else None

@@ -83,14 +83,18 @@ def recommended_venues(request):
     venue_list = []
     for venue in venues:
         bayesian = VenueRating.update_bayesian_for_venue(venue)
+        # If bayesian_rating is None (no ratings), treat score as -1 so
+        # unrated venues sort to the bottom of recommendations.
+        br = bayesian.get('bayesian_rating') if isinstance(bayesian, dict) else None
+        score = br if br is not None else -1
         venue_list.append({
             'venue': venue,
-            'bayesian_rating': bayesian['bayesian_rating']
+            'bayesian_rating': score
         })
     # Sort venues by bayesian_rating descending
     sorted_venues = sorted(venue_list, key=lambda x: x['bayesian_rating'], reverse=True)
-    # Take top N (e.g., 5)
-    top_venues = [v['venue'] for v in sorted_venues[:5]]
+    # Return all venues in sorted order (frontend controls how many to show)
+    top_venues = [v['venue'] for v in sorted_venues]
     serializer = VenueSerializer(top_venues, many=True)
     return Response(serializer.data)
 
