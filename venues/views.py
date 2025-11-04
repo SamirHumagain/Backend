@@ -39,6 +39,9 @@ def haversine_api(request):
     return Response({'distance_km': round(distance, 3)})
 # Ensure IsAuthenticated is imported at the top
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 # Ensure APIView is imported at the top
 from rest_framework.views import APIView
 class OwnerVenueBookingList(APIView):
@@ -95,7 +98,8 @@ def recommended_venues(request):
     sorted_venues = sorted(venue_list, key=lambda x: x['bayesian_rating'], reverse=True)
     # Return all venues in sorted order (frontend controls how many to show)
     top_venues = [v['venue'] for v in sorted_venues]
-    serializer = VenueSerializer(top_venues, many=True)
+    # Provide request in context so nested ImageFields return absolute URLs
+    serializer = VenueSerializer(top_venues, many=True, context={'request': request})
     return Response(serializer.data)
 
 
@@ -385,7 +389,7 @@ class AdminVenueList(APIView):
 
     def get(self, request):
         venues = Venue.objects.all()
-        serializer = VenueSerializer(venues, many=True)
+        serializer = VenueSerializer(venues, many=True, context={'request': request})
         return Response(serializer.data)
 
 class AdminBookingList(APIView):
@@ -422,8 +426,49 @@ class UserBookingList(APIView):
 class UserProfile(APIView):
     permission_classes = [IsAuthenticated]
 
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
     def get(self, request):
         user = request.user
+        # Ensure profile_image is a JSON-serializable string.
+        profile_image_value = user.profile_image
+        try:
+            # If stored as bytes (accidental), convert to a base64 data URL so JSON encoder won't choke
+            if isinstance(profile_image_value, (bytes, bytearray)):
+                import base64, imghdr
+                kind = imghdr.what(None, profile_image_value) or 'png'
+                mime = f'image/{kind}'
+                b64 = base64.b64encode(profile_image_value).decode('ascii')
+                profile_image_value = f'data:{mime};base64,{b64}'
+            # If it's a Django File/FieldFile with a url attribute, build absolute URI
+            elif hasattr(profile_image_value, 'url'):
+                profile_image_value = request.build_absolute_uri(profile_image_value.url)
+            else:
+                # Coerce to string (covers URLField stored values)
+                profile_image_value = str(profile_image_value or '')
+                # If it looks like a bare filename (no scheme) and the file exists under MEDIA_ROOT,
+                # serve it from MEDIA_URL/profile_images/ or MEDIA_URL/<filename>
+                import os
+                from django.conf import settings as dj_settings
+                # ignore data URLs or already absolute URLs
+                if profile_image_value and not profile_image_value.startswith(('http://', 'https://', '/', 'data:')):
+                    # check common locations
+                    candidates = [
+                        os.path.join(dj_settings.MEDIA_ROOT, 'profile_images', profile_image_value),
+                        os.path.join(dj_settings.MEDIA_ROOT, profile_image_value),
+                    ]
+                    rel_path = None
+                    for cand in candidates:
+                        if os.path.exists(cand):
+                            # build relative path from MEDIA_ROOT
+                            rel_path = os.path.relpath(cand, dj_settings.MEDIA_ROOT).replace('\\', '/')
+                            break
+                    if rel_path:
+                        profile_image_value = request.build_absolute_uri(dj_settings.MEDIA_URL + rel_path)
+        except Exception:
+            # Fallback to an empty string on any unexpected error
+            profile_image_value = ''
+
         return Response({
             'id': user.id,
             'name': user.name,
@@ -433,19 +478,64 @@ class UserProfile(APIView):
             'is_active': user.is_active,
             'phone': user.phone,
             'address': user.address,
-            'profile_image': user.profile_image,
+            'profile_image': profile_image_value,
         })
 
     def patch(self, request):
         user = request.user
         data = request.data
         updated = False
-        for field in ['name', 'email', 'phone', 'address', 'profile_image']:
+        # If a file was uploaded for profile image, save it to MEDIA and store absolute URL
+        if 'profile_image' in request.FILES:
+            f = request.FILES['profile_image']
+            # Save file under profile_images/ directory
+            saved_path = default_storage.save(f'profile_images/{f.name}', ContentFile(f.read()))
+            # Build absolute URL to the saved media
+            image_url = request.build_absolute_uri(settings.MEDIA_URL + saved_path)
+            user.profile_image = image_url
+            updated = True
+
+        # Handle text fields (profile_image as URL is also supported)
+        for field in ['name', 'email', 'phone', 'address']:
             if field in data:
                 setattr(user, field, data[field])
                 updated = True
+        # Support patching profile_image by URL as well
+        if 'profile_image' in data and data.get('profile_image'):
+            user.profile_image = data.get('profile_image')
+            updated = True
         if updated:
             user.save()
+        # Sanitize profile_image before returning (same logic as GET)
+        profile_image_value = user.profile_image
+        try:
+            if isinstance(profile_image_value, (bytes, bytearray)):
+                import base64, imghdr
+                kind = imghdr.what(None, profile_image_value) or 'png'
+                mime = f'image/{kind}'
+                b64 = base64.b64encode(profile_image_value).decode('ascii')
+                profile_image_value = f'data:{mime};base64,{b64}'
+            elif hasattr(profile_image_value, 'url'):
+                profile_image_value = request.build_absolute_uri(profile_image_value.url)
+            else:
+                profile_image_value = str(profile_image_value or '')
+                import os
+                from django.conf import settings as dj_settings
+                if profile_image_value and not profile_image_value.startswith(('http://', 'https://', '/', 'data:')):
+                    candidates = [
+                        os.path.join(dj_settings.MEDIA_ROOT, 'profile_images', profile_image_value),
+                        os.path.join(dj_settings.MEDIA_ROOT, profile_image_value),
+                    ]
+                    rel_path = None
+                    for cand in candidates:
+                        if os.path.exists(cand):
+                            rel_path = os.path.relpath(cand, dj_settings.MEDIA_ROOT).replace('\\', '/')
+                            break
+                    if rel_path:
+                        profile_image_value = request.build_absolute_uri(dj_settings.MEDIA_URL + rel_path)
+        except Exception:
+            profile_image_value = ''
+
         return Response({
             'id': user.id,
             'name': user.name,
@@ -455,5 +545,5 @@ class UserProfile(APIView):
             'is_active': user.is_active,
             'phone': user.phone,
             'address': user.address,
-            'profile_image': user.profile_image,
+            'profile_image': profile_image_value,
         })

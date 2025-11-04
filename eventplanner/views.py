@@ -1,6 +1,8 @@
 from rest_framework import viewsets, generics, permissions
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .models import CateringItem, Service, EventType, VenueImage
 from .serializers import CateringItemSerializer, ServiceSerializer, EventTypeSerializer, VenueImageSerializer
+from venues.models import Venue
 
 class CateringItemListCreateView(generics.ListCreateAPIView):
 	serializer_class = CateringItemSerializer
@@ -28,7 +30,18 @@ class ServiceViewSet(viewsets.ModelViewSet):
 		return qs
 	def perform_create(self, serializer):
 		venue_id = self.request.data.get('venue')
-		serializer.save(venue_id=venue_id)
+		instance = serializer.save(venue_id=venue_id)
+		# After saving the VenueImage, update the Venue.primary image field to this image's URL
+		try:
+			if venue_id and instance and getattr(instance, 'image', None):
+				# instance.image.url will provide the media URL
+				# Build an absolute URL so frontend (served on a different port) can fetch directly
+				rel_url = instance.image.url if hasattr(instance.image, 'url') else str(instance.image)
+				image_url = self.request.build_absolute_uri(rel_url)
+				Venue.objects.filter(id=venue_id).update(image=image_url)
+		except Exception:
+			# Do not fail the create if updating the venue image fails
+			pass
 
 class EventTypeViewSet(viewsets.ModelViewSet):
 	queryset = EventType.objects.all()
@@ -48,6 +61,8 @@ class VenueImageViewSet(viewsets.ModelViewSet):
 	queryset = VenueImage.objects.all()
 	serializer_class = VenueImageSerializer
 	permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+	# Allow multipart/form-data file uploads
+	parser_classes = [MultiPartParser, FormParser, JSONParser]
 	def get_queryset(self):
 		venue_id = self.request.query_params.get('venue')
 		qs = VenueImage.objects.all()

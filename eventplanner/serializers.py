@@ -17,6 +17,9 @@ class EventTypeSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'label', 'price', 'venue']
 
 class VenueImageSerializer(serializers.ModelSerializer):
+    # Use ImageField so DRF will accept uploaded files and return URL in response
+    image = serializers.ImageField(use_url=True, required=True)
+
     class Meta:
         model = VenueImage
         fields = '__all__'

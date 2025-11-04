@@ -34,4 +34,5 @@ class Service(models.Model):
 # VenueImage model for multiple images per venue
 class VenueImage(models.Model):
 	venue = models.ForeignKey('venues.Venue', on_delete=models.CASCADE, related_name='images')
-	image = models.URLField(max_length=500)
+	# Switch to ImageField so we can accept file uploads from frontend (stores file in MEDIA_ROOT)
+	image = models.ImageField(upload_to='venue_images/')
