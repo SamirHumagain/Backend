@@ -30,18 +30,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
 		return qs
 	def perform_create(self, serializer):
 		venue_id = self.request.data.get('venue')
-		instance = serializer.save(venue_id=venue_id)
-		# After saving the VenueImage, update the Venue.primary image field to this image's URL
-		try:
-			if venue_id and instance and getattr(instance, 'image', None):
-				# instance.image.url will provide the media URL
-				# Build an absolute URL so frontend (served on a different port) can fetch directly
-				rel_url = instance.image.url if hasattr(instance.image, 'url') else str(instance.image)
-				image_url = self.request.build_absolute_uri(rel_url)
-				Venue.objects.filter(id=venue_id).update(image=image_url)
-		except Exception:
-			# Do not fail the create if updating the venue image fails
-			pass
+		# Standard create for Service; no venue-image side effects here
+		serializer.save(venue_id=venue_id)
 
 class EventTypeViewSet(viewsets.ModelViewSet):
 	queryset = EventType.objects.all()
@@ -55,6 +45,7 @@ class EventTypeViewSet(viewsets.ModelViewSet):
 		return qs
 	def perform_create(self, serializer):
 		venue_id = self.request.data.get('venue')
+		# Standard create for EventType
 		serializer.save(venue_id=venue_id)
 
 class VenueImageViewSet(viewsets.ModelViewSet):
@@ -71,4 +62,15 @@ class VenueImageViewSet(viewsets.ModelViewSet):
 		return qs
 	def perform_create(self, serializer):
 		venue_id = self.request.data.get('venue')
-		serializer.save(venue_id=venue_id)
+		# Save the VenueImage instance
+		instance = serializer.save(venue_id=venue_id)
+		# After saving the VenueImage, update the Venue.image field to this image's absolute URL
+		try:
+			if venue_id and instance and getattr(instance, 'image', None):
+				rel_url = instance.image.url if hasattr(instance.image, 'url') else str(instance.image)
+				# Use request to build absolute URL
+				image_url = self.request.build_absolute_uri(rel_url)
+				Venue.objects.filter(id=venue_id).update(image=image_url)
+		except Exception:
+			# Do not fail the create if updating the venue image fails
+			pass
