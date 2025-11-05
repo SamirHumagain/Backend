@@ -109,6 +109,21 @@ class FavoriteVenueViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
     serializer_class = FavoriteVenueSerializer
 
+    def get_queryset(self):
+        # Only return favorites for the requesting user (unless admin)
+        user = getattr(self.request, 'user', None)
+        qs = FavoriteVenue.objects.all()
+        try:
+            if user and user.is_authenticated:
+                # Admins can see all favorites; regular users only their own
+                if getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False):
+                    return qs
+                return qs.filter(user=user)
+        except Exception:
+            pass
+        # Unauthenticated requests get an empty queryset
+        return FavoriteVenue.objects.none()
+
     def perform_create(self, serializer):
         from django.db import IntegrityError
         from rest_framework import serializers
