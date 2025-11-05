@@ -179,18 +179,30 @@ class VenueViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        # If the user is authenticated and is a venue owner, return only their venues with booking stats
-        if user.is_authenticated and hasattr(user, 'user_type') and user.user_type == 'venue_owner':
-            from django.db.models import Count, Q, Avg
-            return (
-                Venue.objects.filter(owner=user)
-                .annotate(
-                    bookings_count=Count('events__reservations', filter=Q(events__reservations__status='approved'), distinct=True),
-                    pending_requests=Count('events__reservations', filter=Q(events__reservations__status='pending'), distinct=True),
-                    avg_rating=Avg('ratings__rating')
+        # If this request is explicitly for the owner's list endpoint (/venues/owner/),
+        # return only venues owned by the authenticated venue_owner with booking stats.
+        path = ''
+        try:
+            path = self.request.path or ''
+        except Exception:
+            path = ''
+
+        if path.endswith('/venues/owner/') or path.endswith('/venues/owner'):
+            # Ensure user is authenticated and is a venue owner
+            if user.is_authenticated and hasattr(user, 'user_type') and user.user_type == 'venue_owner':
+                from django.db.models import Count, Q, Avg
+                return (
+                    Venue.objects.filter(owner=user)
+                    .annotate(
+                        bookings_count=Count('events__reservations', filter=Q(events__reservations__status='approved'), distinct=True),
+                        pending_requests=Count('events__reservations', filter=Q(events__reservations__status='pending'), distinct=True),
+                        avg_rating=Avg('ratings__rating')
+                    )
                 )
-            )
-        # Otherwise, return all venues
+            # If not authenticated or not a venue_owner, return empty queryset for owner endpoint
+            return Venue.objects.none()
+
+        # Default: public listing (e.g., /api/venues/) returns all venues
         return Venue.objects.all()
 
     def perform_create(self, serializer):
